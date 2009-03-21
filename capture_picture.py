@@ -22,14 +22,16 @@ video = v4l2capture.Video_device("/dev/video0")
 # return another size if it doesn't support the suggested one.
 size_x, size_y = video.set_format(1280, 1024)
 
+# Create a buffer to store image data in. This must be done before
+# calling 'start' if v4l2capture is compiled with libv4l2. Otherwise
+# raises IOError.
+video.create_buffers(1)
+
 # Start the device. This lights the LED if it's a camera that has one.
 video.start()
 
 # Wait a little. Some cameras take a few seconds to get bright enough.
 time.sleep(2)
-
-# Create a buffer to store image data in.
-video.create_buffers(1)
 
 # Send the buffer to the device.
 video.queue_all_buffers()

@@ -24,4 +24,5 @@ setup(
     classifiers = [
         "License :: Public Domain",
         "Programming Language :: C"],
-    ext_modules = [Extension("v4l2capture", ["v4l2capture.c"])])
+    ext_modules = [
+        Extension("v4l2capture", ["v4l2capture.c"], libraries = ["v4l2"])])

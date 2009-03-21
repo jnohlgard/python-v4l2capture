@@ -1,4 +1,4 @@
-// python-v4l2-capture
+// python-v4l2capture
 //
 // 2009 Fredrik Portstrom
 //
@@ -8,11 +8,23 @@
 // purpose, without any conditions, unless such conditions are
 // required by law.
 
+#define USE_LIBV4L
+
 #include <Python.h>
 #include <fcntl.h>
 #include <linux/videodev2.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
+
+#ifdef USE_LIBV4L
+#include <libv4l2.h>
+#else
+#include <sys/ioctl.h>
+#define v4l2_close close
+#define v4l2_ioctl ioctl
+#define v4l2_mmap mmap
+#define v4l2_munmap munmap
+#define v4l2_open open
+#endif
 
 #define ASSERT_OPEN if(self->fd < 0)					\
     {									\
@@ -40,7 +52,7 @@ static int my_ioctl(int fd, int request, void *arg)
 
   for(;;)
     {
-      int result = ioctl(fd, request, arg);
+      int result = v4l2_ioctl(fd, request, arg);
 
       if(!result)
 	{
@@ -61,7 +73,7 @@ static void Video_device_unmap(Video_device *self)
 
   for(i = 0; i < self->buffer_count; i++)
     {
-      munmap(self->buffers[i].start, self->buffers[i].length);
+      v4l2_munmap(self->buffers[i].start, self->buffers[i].length);
     }
 }
 
@@ -74,7 +86,7 @@ static void Video_device_dealloc(Video_device *self)
 	  Video_device_unmap(self);
 	}
 
-      close(self->fd);
+      v4l2_close(self->fd);
     }
 
   self->ob_type->tp_free((PyObject *)self);
@@ -90,7 +102,7 @@ static int Video_device_init(Video_device *self, PyObject *args,
       return -1;
     }
 
-  int fd = open(device_path, O_RDWR | O_NONBLOCK);
+  int fd = v4l2_open(device_path, O_RDWR | O_NONBLOCK);
 
   if(fd < 0)
     {
@@ -112,7 +124,7 @@ static PyObject *Video_device_close(Video_device *self)
 	  Video_device_unmap(self);
 	}
 
-      close(self->fd);
+      v4l2_close(self->fd);
       self->fd = -1;
     }
 
@@ -152,7 +164,11 @@ static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
   format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   format.fmt.pix.width = size_x;
   format.fmt.pix.height = size_y;
+#ifdef USE_LIBV4L
+  format.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
+#else
   format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+#endif
   format.fmt.pix.field = V4L2_FIELD_INTERLACED;
   format.fmt.pix.bytesperline = 0;
 
@@ -248,8 +264,8 @@ static PyObject *Video_device_create_buffers(Video_device *self, PyObject *args)
 	}
 
       self->buffers[i].length = buffer.length;
-      self->buffers[i].start = mmap(NULL, buffer.length, PROT_READ | PROT_WRITE,
-	  MAP_SHARED, self->fd, buffer.m.offset);
+      self->buffers[i].start = v4l2_mmap(NULL, buffer.length,
+	  PROT_READ | PROT_WRITE, MAP_SHARED, self->fd, buffer.m.offset);
 
       if(self->buffers[i].start == MAP_FAILED)
 	{
@@ -308,12 +324,26 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
       return NULL;
     }
 
+#ifdef USE_LIBV4L
+  PyObject *result = PyString_FromStringAndSize(
+      self->buffers[buffer.index].start, self->buffers[buffer.index].length);
+
+  if(!result)
+    {
+      return NULL;
+    }
+#else
   // Convert buffer from YUYV to RGB.
   // For the byte order, see: http://v4l2spec.bytesex.org/spec/r4339.htm
   // For the color conversion, see: http://v4l2spec.bytesex.org/spec/x2123.htm
-
   int length = self->buffers[buffer.index].length / 4 * 6;
   PyObject *result = PyString_FromStringAndSize(NULL, length);
+
+  if(!result)
+    {
+      return NULL;
+    }
+
   char *rgb = PyString_AS_STRING(result);
   char *rgb_max = rgb + length;
   unsigned char *yuyv = self->buffers[buffer.index].start;
@@ -347,6 +377,7 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
       yuyv += 4;
     }
 #undef CLAMP
+#endif
 
   if(queue && my_ioctl(self->fd, VIDIOC_QBUF, &buffer))
     {
