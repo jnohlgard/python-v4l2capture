@@ -14,7 +14,7 @@ python-v4l2capture is a slim and easy to use Python extension for
 capturing video with video4linux2. It supports libv4l to convert any
 image format to RGB.
 
-python-v4l2capture: https://launchpad.net/python-v4l2-capture
+python-v4l2capture: http://fredrik.jemla.eu/v4l2capture
 
 libv4l: http://hansdegoede.livejournal.com/3636.html
 
@@ -28,8 +28,8 @@ the YUYV pixel format. You can do so by erasing ', libraries =
 v4l2capture.c.
 
 python-v4l2capture uses distutils.
-To build: ./setup build
-To build and install: ./setup install
+To build: ./setup.py build
+To build and install: ./setup.py install
 
 Example
 =======

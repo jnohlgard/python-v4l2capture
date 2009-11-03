@@ -1,4 +1,5 @@
 // python-v4l2capture
+// Python extension to capture video with video4linux2
 //
 // 2009 Fredrik Portstrom
 //
