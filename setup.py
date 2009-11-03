@@ -13,7 +13,7 @@
 from distutils.core import Extension, setup
 setup(
     name = "v4l2capture",
-    version = "1.0",
+    version = "1.1",
     author = "Fredrik Portstrom",
     author_email = "fredrik@jemla.se",
     url = "http://fredrik.jemla.eu/v4l2capture",
