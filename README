@@ -1,7 +1,7 @@
 python-v4l2capture 1.1
 Python extension to capture video with video4linux2
 
-2009 Fredrik Portstrom
+2009, 2010 Fredrik Portstrom
 
 I, the copyright holder of this file, hereby release it into the
 public domain. This applies worldwide. In case this is not legally
@@ -35,10 +35,13 @@ To build and install: ./setup.py install
 Example
 =======
 
-See capture_picture.py and list_devices.py.
+See capture_picture.py, capture_picture_delayed.py and list_devices.py.
 
 Change log
 ==========
+
+1.2 (2010-04-01) - Forked example script into capture_picture.py and
+    		   capture_picture_delayed.py.
 
 1.1 (2009-11-03) - Updated URL and documentation.
 

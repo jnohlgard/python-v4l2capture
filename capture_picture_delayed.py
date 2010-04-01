@@ -3,7 +3,11 @@
 # python-v4l2capture
 #
 # This file is an example on how to capture a picture with
-# python-v4l2capture.
+# python-v4l2capture. It waits between starting the video device and
+# capturing the picture, to get a good picture from cameras that
+# require a delay to get enough brightness. It does not work with some
+# devices that require starting to capture pictures immediatly when
+# the device is started.
 #
 # 2009, 2010 Fredrik Portstrom
 #
@@ -15,6 +19,7 @@
 
 import Image
 import select
+import time
 import v4l2capture
 
 # Open the video device.
@@ -29,12 +34,14 @@ size_x, size_y = video.set_format(1280, 1024)
 # raises IOError.
 video.create_buffers(1)
 
-# Send the buffer to the device. Some devices require this to be done
-# before calling 'start'.
-video.queue_all_buffers()
-
 # Start the device. This lights the LED if it's a camera that has one.
 video.start()
+
+# Wait a little. Some cameras take a few seconds to get bright enough.
+time.sleep(2)
+
+# Send the buffer to the device.
+video.queue_all_buffers()
 
 # Wait for the device to fill the buffer.
 select.select((video,), (), ())
