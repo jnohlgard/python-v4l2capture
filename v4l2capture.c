@@ -1,7 +1,7 @@
 // python-v4l2capture
 // Python extension to capture video with video4linux2
 //
-// 2009 Fredrik Portstrom
+// 2009, 2010 Fredrik Portstrom
 //
 // I, the copyright holder of this file, hereby release it into the
 // public domain. This applies worldwide. In case this is not legally
@@ -46,6 +46,29 @@ typedef struct {
   int buffer_count;
 } Video_device;
 
+struct capability {
+  int id;
+  const char *name;
+};
+
+static struct capability capabilities[] = {
+  { V4L2_CAP_ASYNCIO, "asyncio" },
+  { V4L2_CAP_AUDIO, "audio" },
+  { V4L2_CAP_HW_FREQ_SEEK, "hw_freq_seek" },
+  { V4L2_CAP_RADIO, "radio" },
+  { V4L2_CAP_RDS_CAPTURE, "rds_capture" },
+  { V4L2_CAP_READWRITE, "readwrite" },
+  { V4L2_CAP_SLICED_VBI_CAPTURE, "sliced_vbi_capture" },
+  { V4L2_CAP_SLICED_VBI_OUTPUT, "sliced_vbi_output" },
+  { V4L2_CAP_STREAMING, "streaming" },
+  { V4L2_CAP_TUNER, "tuner" },
+  { V4L2_CAP_VBI_CAPTURE, "vbi_capture" },
+  { V4L2_CAP_VBI_OUTPUT, "vbi_output" },
+  { V4L2_CAP_VIDEO_CAPTURE, "video_capture" },
+  { V4L2_CAP_VIDEO_OUTPUT, "video_output" },
+  { V4L2_CAP_VIDEO_OUTPUT_OVERLAY, "video_output_overlay" },
+  { V4L2_CAP_VIDEO_OVERLAY, "video_overlay" }
+};
 
 static int my_ioctl(int fd, int request, void *arg)
 {
@@ -148,7 +171,34 @@ static PyObject *Video_device_get_info(Video_device *self)
       return NULL;
     }
 
-  return Py_BuildValue("sss", caps.driver, caps.card, caps.bus_info);
+  PyObject *set = PySet_New(NULL);
+
+  if(!set)
+    {
+      return NULL;
+    }
+
+  struct capability *capability = capabilities;
+
+  while(capability < (void *)capabilities + sizeof(capabilities))
+    {
+      if(caps.capabilities & capability->id)
+	{
+	  PyObject *s = PyString_FromString(capability->name);
+
+	  if(!s)
+	    {
+              Py_DECREF(set);
+	      return NULL;
+	    }
+
+	  PySet_Add(set, s);
+	}
+
+      capability++;
+    }
+
+  return Py_BuildValue("sssO", caps.driver, caps.card, caps.bus_info, set);
 }
 
 static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
@@ -407,8 +457,10 @@ static PyMethodDef Video_device_methods[] = {
        "This enables video devices to be passed select.select for waiting "
        "until a frame is available for reading."},
   {"get_info", (PyCFunction)Video_device_get_info, METH_NOARGS,
-       "get_info() -> driver, card, bus_info\n\n"
-       "Returns three strings with information about the video device."},
+       "get_info() -> driver, card, bus_info, capabilities\n\n"
+       "Returns three strings with information about the video device, and one "
+       "set containing strings identifying the capabilities of the video "
+       "device."},
   {"set_format", (PyCFunction)Video_device_set_format, METH_VARARGS,
        "set_format(size_x, size_y) -> size_x, size_y\n\n"
        "Request the video device to set image size. The device may choose "

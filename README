@@ -40,6 +40,9 @@ See capture_picture.py, capture_picture_delayed.py and list_devices.py.
 Change log
 ==========
 
+1.3 (2010-07-21) - Added set of capabilities to the return value of
+                   get_info. Updated list_devices.py.
+
 1.2 (2010-04-01) - Forked example script into capture_picture.py and
     		   capture_picture_delayed.py.
 

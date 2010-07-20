@@ -2,7 +2,7 @@
 #
 # python-v4l2capture
 #
-# 2009 Fredrik Portstrom
+# 2009, 2010 Fredrik Portstrom
 #
 # I, the copyright holder of this file, hereby release it into the
 # public domain. This applies worldwide. In case this is not legally
@@ -19,8 +19,10 @@ for file_name in file_names:
     print path
     try:
         video = v4l2capture.Video_device(path)
-        print "    driver:    %s\n    card:      %s\n    bus info:  %s" \
-            % video.get_info()
+        driver, card, bus_info, capabilities = video.get_info()
+        print "    driver:       %s\n    card:         %s" \
+            "\n    bus info:     %s\n    capabilities: %s" % (
+                driver, card, bus_info, ", ".join(capabilities))
         video.close()
     except IOError, e:
         print "    " + str(e)
