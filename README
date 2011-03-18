@@ -1,7 +1,7 @@
 python-v4l2capture 1.1
 Python extension to capture video with video4linux2
 
-2009, 2010 Fredrik Portstrom
+2009, 2010, 2011 Fredrik Portstrom
 
 I, the copyright holder of this file, hereby release it into the
 public domain. This applies worldwide. In case this is not legally
@@ -13,20 +13,19 @@ Introduction
 
 python-v4l2capture is a slim and easy to use Python extension for
 capturing video with video4linux2. It supports libv4l to convert any
-image format to RGB.
+image format to RGB or YUV420.
 
 python-v4l2capture: http://fredrik.jemla.eu/v4l2capture
 
-libv4l: http://hansdegoede.livejournal.com/3636.html
+libv4l: http://freshmeat.net/projects/libv4l
 
 Installation
 ============
 
 v4l2capture requires libv4l by default. You can compile v4l2capture
-without libv4l if you only want it to support video devices supporting
-the YUYV pixel format. You can do so by erasing ', libraries =
-["v4l2"]' in setup.py and erasing '#define USE_LIBV4L' in
-v4l2capture.c.
+without libv4l, but that reduces image format support to YUYV input
+and RGB output only. You can do so by erasing ', libraries = ["v4l2"]'
+in setup.py and erasing '#define USE_LIBV4L' in v4l2capture.c.
 
 python-v4l2capture uses distutils.
 To build: ./setup.py build
@@ -39,6 +38,8 @@ See capture_picture.py, capture_picture_delayed.py and list_devices.py.
 
 Change log
 ==========
+
+1.4 (2011-03-18) - Added support for YUV420 output.
 
 1.3 (2010-07-21) - Added set of capabilities to the return value of
                    get_info. Updated list_devices.py.

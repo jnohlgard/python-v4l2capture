@@ -1,7 +1,7 @@
 // python-v4l2capture
 // Python extension to capture video with video4linux2
 //
-// 2009, 2010 Fredrik Portstrom
+// 2009, 2010, 2011 Fredrik Portstrom
 //
 // I, the copyright holder of this file, hereby release it into the
 // public domain. This applies worldwide. In case this is not legally
@@ -180,7 +180,7 @@ static PyObject *Video_device_get_info(Video_device *self)
 
   struct capability *capability = capabilities;
 
-  while(capability < (void *)capabilities + sizeof(capabilities))
+  while((void *)capability < (void *)capabilities + sizeof(capabilities))
     {
       if(caps.capabilities & capability->id)
 	{
@@ -205,8 +205,9 @@ static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
 {
   int size_x;
   int size_y;
+  int yuv420 = 0;
 
-  if(!PyArg_ParseTuple(args, "ii", &size_x, &size_y))
+  if(!PyArg_ParseTuple(args, "ii|i", &size_x, &size_y, &yuv420))
     {
       return NULL;
     }
@@ -216,7 +217,8 @@ static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
   format.fmt.pix.width = size_x;
   format.fmt.pix.height = size_y;
 #ifdef USE_LIBV4L
-  format.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
+  format.fmt.pix.pixelformat =
+    yuv420 ? V4L2_PIX_FMT_YUV420 : V4L2_PIX_FMT_RGB24;
 #else
   format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 #endif
@@ -462,9 +464,11 @@ static PyMethodDef Video_device_methods[] = {
        "set containing strings identifying the capabilities of the video "
        "device."},
   {"set_format", (PyCFunction)Video_device_set_format, METH_VARARGS,
-       "set_format(size_x, size_y) -> size_x, size_y\n\n"
-       "Request the video device to set image size. The device may choose "
-       "another size than requested and will return its choice."},
+       "set_format(size_x, size_y, yuv420 = 0) -> size_x, size_y\n\n"
+       "Request the video device to set image size and format. The device may "
+       "choose another size than requested and will return its choice. The "
+       "image format will be RGB24 if yuv420 is false (default) or YUV420 if "
+       "yuv420 is true."},
   {"start", (PyCFunction)Video_device_start, METH_NOARGS,
        "start()\n\n"
        "Start video capture."},
@@ -481,9 +485,10 @@ static PyMethodDef Video_device_methods[] = {
        "Let the video device fill all buffers created."},
   {"read", (PyCFunction)Video_device_read, METH_NOARGS,
        "read() -> string\n\n"
-       "Reads RGB image data from a buffer that has been filled by the video "
-       "device. The buffer is removed from the queue. Fails if no buffer is "
-       "filled. Use select.select to check for filled buffers."},
+       "Reads image data from a buffer that has been filled by the video "
+       "device. The image data is in RGB och YUV420 format as decided by "
+       "'set_format'. The buffer is removed from the queue. Fails if no buffer "
+       "is filled. Use select.select to check for filled buffers."},
   {"read_and_queue", (PyCFunction)Video_device_read_and_queue, METH_NOARGS,
        "read_and_queue()\n\n"
        "Same as 'read', but adds the buffer back to the queue so the video "
