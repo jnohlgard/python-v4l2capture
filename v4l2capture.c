@@ -279,7 +279,7 @@ static PyObject *Video_device_create_buffers(Video_device *self, PyObject *args)
     }
 
   struct v4l2_requestbuffers reqbuf;
-  reqbuf.count = 4;
+  reqbuf.count = buffer_count;
   reqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   reqbuf.memory = V4L2_MEMORY_MMAP;
 
