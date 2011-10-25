@@ -1,7 +1,8 @@
-python-v4l2capture 1.1
+python-v4l2capture 1.4.x
 Python extension to capture video with video4linux2
 
 2009, 2010, 2011 Fredrik Portstrom
+2011 Joakim Gebart
 
 I, the copyright holder of this file, hereby release it into the
 public domain. This applies worldwide. In case this is not legally
@@ -15,7 +16,9 @@ python-v4l2capture is a slim and easy to use Python extension for
 capturing video with video4linux2. It supports libv4l to convert any
 image format to RGB or YUV420.
 
-python-v4l2capture: http://fredrik.jemla.eu/v4l2capture
+this fork of python-v4l2capture: https://github.com/gebart/python-v4l2capture
+
+original python-v4l2capture: http://fredrik.jemla.eu/v4l2capture
 
 libv4l: http://freshmeat.net/projects/libv4l
 
@@ -38,6 +41,8 @@ See capture_picture.py, capture_picture_delayed.py and list_devices.py.
 
 Change log
 ==========
+
+(see git log for latest changes)
 
 1.4 (2011-03-18) - Added support for YUV420 output.
 
