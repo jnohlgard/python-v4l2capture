@@ -379,7 +379,7 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
 
 #ifdef USE_LIBV4L
   PyObject *result = PyString_FromStringAndSize(
-      self->buffers[buffer.index].start, self->buffers[buffer.index].length);
+      self->buffers[buffer.index].start, buffer.bytesused);
 
   if(!result)
     {
@@ -389,7 +389,7 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
   // Convert buffer from YUYV to RGB.
   // For the byte order, see: http://v4l2spec.bytesex.org/spec/r4339.htm
   // For the color conversion, see: http://v4l2spec.bytesex.org/spec/x2123.htm
-  int length = self->buffers[buffer.index].length / 4 * 6;
+  int length = buffer.bytesused * 6 / 4;
   PyObject *result = PyString_FromStringAndSize(NULL, length);
 
   if(!result)
