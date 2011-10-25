@@ -401,7 +401,7 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
   char *rgb_max = rgb + length;
   unsigned char *yuyv = self->buffers[buffer.index].start;
 
-#define CLAMP (c <= 0 ? 0 : c >= 65025 ? 255 : c >> 8)
+#define CLAMP(c) ((c) <= 0 ? 0 : (c) >= 65025 ? 255 : (c) >> 8)
   while(rgb < rgb_max)
     {
       int u = yuyv[1] - 128;
@@ -410,21 +410,15 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
       u *= 516;
       v *= 409;
 
-      int y = 298 * (*yuyv - 16);
-      int c = y + v;
-      *rgb = CLAMP;
-      c = y - uv;
-      rgb[1] = CLAMP;
-      c = y + u;
-      rgb[2] = CLAMP;
+      int y = 298 * (yuyv[0] - 16);
+      rgb[0] = CLAMP(y + v);
+      rgb[1] = CLAMP(y - uv);
+      rgb[2] = CLAMP(y + u);
 
       y = 298 * (yuyv[2] - 16);
-      c = y + v;
-      rgb[3] = CLAMP;
-      c = y - uv;
-      rgb[4] = CLAMP;
-      c = y + u;
-      rgb[5] = CLAMP;
+      rgb[3] = CLAMP(y + v);
+      rgb[4] = CLAMP(y - uv);
+      rgb[5] = CLAMP(y + u);
 
       rgb += 6;
       yuyv += 4;
