@@ -233,6 +233,24 @@ static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
   return Py_BuildValue("ii", format.fmt.pix.width, format.fmt.pix.height);
 }
 
+static PyObject *Video_device_set_fps(Video_device *self, PyObject *args)
+{
+  int fps;
+  if(!PyArg_ParseTuple(args, "i", &fps))
+    {
+      return NULL;
+    }
+  struct v4l2_streamparm setfps;
+  memset(&setfps, 0, sizeof(struct v4l2_streamparm));
+  setfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  setfps.parm.capture.timeperframe.numerator = 1;
+  setfps.parm.capture.timeperframe.denominator = fps;
+  if(my_ioctl(self->fd, VIDIOC_S_PARM, &setfps)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",setfps.parm.capture.timeperframe.denominator);
+}
+
 static PyObject *Video_device_start(Video_device *self)
 {
   ASSERT_OPEN;
@@ -463,6 +481,10 @@ static PyMethodDef Video_device_methods[] = {
        "choose another size than requested and will return its choice. The "
        "image format will be RGB24 if yuv420 is false (default) or YUV420 if "
        "yuv420 is true."},
+  {"set_fps", (PyCFunction)Video_device_set_fps, METH_VARARGS,
+       "set_fps(fps) -> fps \n\n"
+       "Request the video device to set frame per seconds.The device may "
+       "choose another frame rate than requested and will return its choice. " },
   {"start", (PyCFunction)Video_device_start, METH_NOARGS,
        "start()\n\n"
        "Start video capture."},
