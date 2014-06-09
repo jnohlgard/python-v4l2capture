@@ -34,6 +34,8 @@
       return NULL;							\
     }
 
+#define CLEAR(x) memset(&(x), 0, sizeof(x))
+
 struct buffer {
   void *start;
   size_t length;
@@ -201,21 +203,36 @@ static PyObject *Video_device_get_info(Video_device *self)
   return Py_BuildValue("sssO", caps.driver, caps.card, caps.bus_info, set);
 }
 
-static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
+static PyObject *Video_device_set_format(Video_device *self, PyObject *args, PyObject *keywds)
 {
   int size_x;
   int size_y;
   int yuv420 = 0;
+  int fourcc;
+  const char *fourcc_str;
+  int fourcc_len = 0;
+  static char *kwlist [] = {
+    "size_x",
+    "size_y",
+    "yuv420",
+    "fourcc",
+    NULL
+  };
 
-  if(!PyArg_ParseTuple(args, "ii|i", &size_x, &size_y, &yuv420))
+  if (!PyArg_ParseTupleAndKeywords(args, keywds, "ii|is#", kwlist, &size_x, &size_y, &yuv420, &fourcc_str, &fourcc_len))
     {
       return NULL;
     }
 
   struct v4l2_format format;
+  CLEAR(format);
   format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  format.fmt.pix.width = size_x;
-  format.fmt.pix.height = size_y;
+  /* Get the current format */
+  if(my_ioctl(self->fd, VIDIOC_G_FMT, &format))
+  {
+    return NULL;
+  }
+
 #ifdef USE_LIBV4L
   format.fmt.pix.pixelformat =
     yuv420 ? V4L2_PIX_FMT_YUV420 : V4L2_PIX_FMT_RGB24;
@@ -223,13 +240,26 @@ static PyObject *Video_device_set_format(Video_device *self, PyObject *args)
   format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 #endif
   format.fmt.pix.field = V4L2_FIELD_INTERLACED;
+
+  if (fourcc_len == 4) {
+    fourcc = v4l2_fourcc(fourcc_str[0],
+                       fourcc_str[1],
+                       fourcc_str[2],
+                       fourcc_str[3]);
+    format.fmt.pix.pixelformat = fourcc;
+    format.fmt.pix.field = V4L2_FIELD_ANY;
+  }
+
+  format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  format.fmt.pix.width = size_x;
+  format.fmt.pix.height = size_y;
   format.fmt.pix.bytesperline = 0;
 
   if(my_ioctl(self->fd, VIDIOC_S_FMT, &format))
     {
       return NULL;
     }
-
+ 
   return Py_BuildValue("ii", format.fmt.pix.width, format.fmt.pix.height);
 }
 
@@ -241,7 +271,7 @@ static PyObject *Video_device_set_fps(Video_device *self, PyObject *args)
       return NULL;
     }
   struct v4l2_streamparm setfps;
-  memset(&setfps, 0, sizeof(struct v4l2_streamparm));
+  CLEAR(setfps);
   setfps.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   setfps.parm.capture.timeperframe.numerator = 1;
   setfps.parm.capture.timeperframe.denominator = fps;
@@ -249,6 +279,241 @@ static PyObject *Video_device_set_fps(Video_device *self, PyObject *args)
   	return NULL;
   }
   return Py_BuildValue("i",setfps.parm.capture.timeperframe.denominator);
+}
+
+static void get_fourcc_str(char *fourcc_str, int fourcc)
+{
+  if (fourcc_str == NULL)
+     return;
+  fourcc_str[0] = (char)(fourcc & 0xFF);
+  fourcc_str[1] = (char)((fourcc >> 8) & 0xFF);
+  fourcc_str[2] = (char)((fourcc >> 16) & 0xFF);
+  fourcc_str[3] = (char)((fourcc >> 24) & 0xFF);
+  fourcc_str[4] = 0;
+}
+
+static PyObject *Video_device_get_format(Video_device *self)
+{
+  struct v4l2_format format;
+  CLEAR(format);
+  format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+  /* Get the current format */
+  if(my_ioctl(self->fd, VIDIOC_G_FMT, &format))
+    {
+      return NULL;
+    }
+
+  char current_fourcc[5];
+  get_fourcc_str(current_fourcc, format.fmt.pix.pixelformat);
+  return Py_BuildValue("iis", format.fmt.pix.width, format.fmt.pix.height, current_fourcc);
+}
+
+static PyObject *Video_device_get_fourcc(Video_device *self, PyObject *args)
+{
+  char *fourcc_str;
+  int size;
+  int fourcc;
+  if (!PyArg_ParseTuple(args, "s#", &fourcc_str, &size))
+    {
+      return NULL;
+    }
+
+  if(size < 4)
+    {
+      return NULL;
+    }
+
+  fourcc = v4l2_fourcc(fourcc_str[0],
+                       fourcc_str[1],
+                       fourcc_str[2],
+                       fourcc_str[3]);
+  return Py_BuildValue("i", fourcc);
+}
+
+static PyObject *Video_device_set_auto_white_balance(Video_device *self, PyObject *args)
+{
+#ifdef V4L2_CID_AUTO_WHITE_BALANCE
+  int autowb;
+  if(!PyArg_ParseTuple(args, "i", &autowb))
+    {
+      return NULL;
+    }
+
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_AUTO_WHITE_BALANCE;
+  ctrl.value = autowb;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_get_auto_white_balance(Video_device *self)
+{
+#ifdef V4L2_CID_AUTO_WHITE_BALANCE
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_AUTO_WHITE_BALANCE;
+  if(my_ioctl(self->fd, VIDIOC_G_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_set_white_balance_temperature(Video_device *self, PyObject *args)
+{
+#ifdef V4L2_CID_WHITE_BALANCE_TEMPERATURE
+  int wb;
+  if(!PyArg_ParseTuple(args, "i", &wb))
+    {
+      return NULL;
+    }
+
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_WHITE_BALANCE_TEMPERATURE;
+  ctrl.value = wb;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_get_white_balance_temperature(Video_device *self)
+{
+#ifdef V4L2_CID_WHITE_BALANCE_TEMPERATURE
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_WHITE_BALANCE_TEMPERATURE;
+  if(my_ioctl(self->fd, VIDIOC_G_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_set_exposure_absolute(Video_device *self, PyObject *args)
+{
+#ifdef V4L2_CID_EXPOSURE_ABSOLUTE
+  int exposure;
+  if(!PyArg_ParseTuple(args, "i", &exposure))
+    {
+      return NULL;
+    }
+
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_EXPOSURE_ABSOLUTE;
+  ctrl.value = exposure;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_get_exposure_absolute(Video_device *self)
+{
+#ifdef V4L2_CID_EXPOSURE_ABSOLUTE
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_EXPOSURE_ABSOLUTE;
+  if(my_ioctl(self->fd, VIDIOC_G_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_set_exposure_auto(Video_device *self, PyObject *args)
+{
+#ifdef V4L2_CID_EXPOSURE_AUTO
+  int autoexposure;
+  if(!PyArg_ParseTuple(args, "i", &autoexposure))
+    {
+      return NULL;
+    }
+
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_EXPOSURE_AUTO;
+  ctrl.value = autoexposure;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_get_exposure_auto(Video_device *self)
+{
+#ifdef V4L2_CID_EXPOSURE_AUTO
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_EXPOSURE_AUTO;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_set_focus_auto(Video_device *self, PyObject *args)
+{
+#ifdef V4L2_CID_FOCUS_AUTO
+  int autofocus;
+  if(!PyArg_ParseTuple(args, "i", &autofocus))
+    {
+      return NULL;
+    }
+
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_FOCUS_AUTO;
+  ctrl.value = autofocus;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
+}
+
+static PyObject *Video_device_get_focus_auto(Video_device *self)
+{
+#ifdef V4L2_CID_FOCUS_AUTO
+  struct v4l2_control ctrl;
+  CLEAR(ctrl);
+  ctrl.id    = V4L2_CID_FOCUS_AUTO;
+  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  	return NULL;
+  }
+  return Py_BuildValue("i",ctrl.value);
+#else
+  return NULL;
+#endif
 }
 
 static PyObject *Video_device_start(Video_device *self)
@@ -475,16 +740,57 @@ static PyMethodDef Video_device_methods[] = {
        "Returns three strings with information about the video device, and one "
        "set containing strings identifying the capabilities of the video "
        "device."},
-  {"set_format", (PyCFunction)Video_device_set_format, METH_VARARGS,
-       "set_format(size_x, size_y, yuv420 = 0) -> size_x, size_y\n\n"
+  {"get_fourcc", (PyCFunction)Video_device_get_fourcc, METH_VARARGS,
+       "get_fourcc(fourcc_string) -> fourcc_int\n\n"
+       "Return the fourcc string encoded as int."},
+  {"get_format", (PyCFunction)Video_device_get_format, METH_NOARGS,
+       "get_format() -> size_x, size_y, fourcc\n\n"
+       "Request the current video format."},
+  {"set_format", (PyCFunction)Video_device_set_format, METH_VARARGS|METH_KEYWORDS,
+       "set_format(size_x, size_y, yuv420 = 0, fourcc='MJPEG') -> size_x, size_y\n\n"
        "Request the video device to set image size and format. The device may "
        "choose another size than requested and will return its choice. The "
-       "image format will be RGB24 if yuv420 is false (default) or YUV420 if "
-       "yuv420 is true."},
+       "image format will be RGB24 if yuv420 is zero (default) or YUV420 if "
+       "yuv420 is 1, if fourcc keyword is set that will be the fourcc pixel format used."},
   {"set_fps", (PyCFunction)Video_device_set_fps, METH_VARARGS,
        "set_fps(fps) -> fps \n\n"
        "Request the video device to set frame per seconds.The device may "
        "choose another frame rate than requested and will return its choice. " },
+  {"set_auto_white_balance", (PyCFunction)Video_device_set_auto_white_balance, METH_VARARGS,
+       "set_auto_white_balance(autowb) -> autowb \n\n"
+       "Request the video device to set auto white balance to value. The device may "
+       "choose another value than requested and will return its choice. " },
+  {"get_auto_white_balance", (PyCFunction)Video_device_get_auto_white_balance, METH_NOARGS,
+       "get_auto_white_balance() -> autowb \n\n"
+       "Request the video device to get auto white balance value. " },
+  {"set_white_balance_temperature", (PyCFunction)Video_device_set_white_balance_temperature, METH_VARARGS,
+       "set_white_balance_temperature(temp) -> temp \n\n"
+       "Request the video device to set white balance tempature to value. The device may "
+       "choose another value than requested and will return its choice. " },
+  {"get_white_balance_temperature", (PyCFunction)Video_device_get_white_balance_temperature, METH_NOARGS,
+       "get_white_balance_temperature() -> temp \n\n"
+       "Request the video device to get white balance temperature value. " },
+  {"set_exposure_auto", (PyCFunction)Video_device_set_exposure_auto, METH_VARARGS,
+       "set_exposure_auto(autoexp) -> autoexp \n\n"
+       "Request the video device to set auto exposure to value. The device may "
+       "choose another value than requested and will return its choice. " },
+  {"get_exposure_auto", (PyCFunction)Video_device_get_exposure_auto, METH_NOARGS,
+       "get_exposure_auto() -> autoexp \n\n"
+       "Request the video device to get auto exposure value. " },
+  {"set_exposure_absolute", (PyCFunction)Video_device_set_exposure_absolute, METH_VARARGS,
+       "set_exposure_absolute(exptime) -> exptime \n\n"
+       "Request the video device to set exposure time to value. The device may "
+       "choose another value than requested and will return its choice. " },
+  {"get_exposure_absolute", (PyCFunction)Video_device_get_exposure_absolute, METH_NOARGS,
+       "get_exposure_absolute() -> exptime \n\n"
+       "Request the video device to get exposure time value. " },
+  {"set_focus_auto", (PyCFunction)Video_device_set_focus_auto, METH_VARARGS,
+       "set_auto_focus_auto(autofocus) -> autofocus \n\n"
+       "Request the video device to set auto focuse on or off. The device may "
+       "choose another value than requested and will return its choice. " },
+  {"get_focus_auto", (PyCFunction)Video_device_get_focus_auto, METH_NOARGS,
+       "get_focus_auto() -> autofocus \n\n"
+       "Request the video device to get auto focus value. " },
   {"start", (PyCFunction)Video_device_start, METH_NOARGS,
        "start()\n\n"
        "Start video capture."},
