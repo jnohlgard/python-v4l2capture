@@ -27,6 +27,11 @@
 #define v4l2_open open
 #endif
 
+#ifndef Py_TYPE
+    #define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#endif
+
+
 #define ASSERT_OPEN if(self->fd < 0)					\
     {									\
       PyErr_SetString(PyExc_ValueError,					\
@@ -115,7 +120,7 @@ static void Video_device_dealloc(Video_device *self)
       v4l2_close(self->fd);
     }
 
-  self->ob_type->tp_free((PyObject *)self);
+  Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 static int Video_device_init(Video_device *self, PyObject *args,
@@ -160,7 +165,11 @@ static PyObject *Video_device_close(Video_device *self)
 static PyObject *Video_device_fileno(Video_device *self)
 {
   ASSERT_OPEN;
+#if PY_MAJOR_VERSION < 3
   return PyInt_FromLong(self->fd);
+#else
+  return PyLong_FromLong(self->fd);
+#endif
 }
 
 static PyObject *Video_device_get_info(Video_device *self)
@@ -186,7 +195,11 @@ static PyObject *Video_device_get_info(Video_device *self)
     {
       if(caps.capabilities & capability->id)
 	{
-	  PyObject *s = PyString_FromString(capability->name);
+#if PY_MAJOR_VERSION < 3
+          PyObject *s = PyString_FromString(capability->name);
+#else
+	  PyObject *s = PyBytes_FromString(capability->name);
+#endif
 
 	  if(!s)
 	    {
@@ -661,7 +674,11 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
     }
 
 #ifdef USE_LIBV4L
+#if PY_MAJOR_VERSION < 3
   PyObject *result = PyString_FromStringAndSize(
+#else
+  PyObject *result = PyBytes_FromStringAndSize(
+#endif
       self->buffers[buffer.index].start, buffer.bytesused);
 
   if(!result)
@@ -673,7 +690,11 @@ static PyObject *Video_device_read_internal(Video_device *self, int queue)
   // For the byte order, see: http://v4l2spec.bytesex.org/spec/r4339.htm
   // For the color conversion, see: http://v4l2spec.bytesex.org/spec/x2123.htm
   int length = buffer.bytesused * 6 / 4;
+#if PY_MAJOR_VERSION < 3
   PyObject *result = PyString_FromStringAndSize(NULL, length);
+#else
+  PyObject *result = PyBytes_FromStringAndSize(NULL, length);
+#endif
 
   if(!result)
     {
@@ -819,8 +840,12 @@ static PyMethodDef Video_device_methods[] = {
 };
 
 static PyTypeObject Video_device_type = {
-  PyObject_HEAD_INIT(NULL)
-      0, "v4l2capture.Video_device", sizeof(Video_device), 0,
+#if PY_MAJOR_VERSION < 3
+  PyObject_HEAD_INIT(NULL) 0,
+#else
+  PyVarObject_HEAD_INIT(NULL, 0)
+#endif
+      "v4l2capture.Video_device", sizeof(Video_device), 0,
       (destructor)Video_device_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       0, Py_TPFLAGS_DEFAULT, "Video_device(path)\n\nOpens the video device at "
       "the given path and returns an object that can capture images. The "
@@ -833,23 +858,55 @@ static PyMethodDef module_methods[] = {
   {NULL}
 };
 
+#if PY_MAJOR_VERSION < 3
 PyMODINIT_FUNC initv4l2capture(void)
+#else
+PyMODINIT_FUNC PyInit_v4l2capture(void)
+#endif
 {
   Video_device_type.tp_new = PyType_GenericNew;
 
   if(PyType_Ready(&Video_device_type) < 0)
     {
+#if PY_MAJOR_VERSION < 3
       return;
+#else
+      return NULL;
+#endif
     }
 
-  PyObject *module = Py_InitModule3("v4l2capture", module_methods,
+  PyObject *module;
+
+#if PY_MAJOR_VERSION < 3
+  module = Py_InitModule3("v4l2capture", module_methods,
       "Capture video with video4linux2.");
+#else
+  static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "v4l2capture",
+    "Capture video with video4linux2.",
+    -1,
+    module_methods,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+  };
+  module = PyModule_Create(&moduledef);
+#endif
 
   if(!module)
     {
+#if PY_MAJOR_VERSION < 3
       return;
+#else
+      return NULL;
+#endif
     }
 
   Py_INCREF(&Video_device_type);
   PyModule_AddObject(module, "Video_device", (PyObject *)&Video_device_type);
+#if PY_MAJOR_VERSION >= 3
+  return module;
+#endif
 }
