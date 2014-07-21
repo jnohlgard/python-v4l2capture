@@ -483,7 +483,7 @@ static PyObject *Video_device_get_exposure_auto(Video_device *self)
   struct v4l2_control ctrl;
   CLEAR(ctrl);
   ctrl.id    = V4L2_CID_EXPOSURE_AUTO;
-  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  if(my_ioctl(self->fd, VIDIOC_G_CTRL, &ctrl)){
   	return NULL;
   }
   return Py_BuildValue("i",ctrl.value);
@@ -520,7 +520,7 @@ static PyObject *Video_device_get_focus_auto(Video_device *self)
   struct v4l2_control ctrl;
   CLEAR(ctrl);
   ctrl.id    = V4L2_CID_FOCUS_AUTO;
-  if(my_ioctl(self->fd, VIDIOC_S_CTRL, &ctrl)){
+  if(my_ioctl(self->fd, VIDIOC_G_CTRL, &ctrl)){
   	return NULL;
   }
   return Py_BuildValue("i",ctrl.value);
